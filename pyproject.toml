@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "satnbot"
+version = "0.1.0"
+description = "Bot trials"
+authors = ["fperezsorrosal <fperezsorrosal@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+openai = "^0.27.2"
+tweepy = "^4.13.0"
+py-cord = "^2.4.1"
+requests = "^2.28.2"
+beautifulsoup4 = "^4.12.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.8.0"
+flake8 = "^5.0.4"
+mypy = "^0.971"
+pytest = "^7.1.3"
+shellcheck-py = "^0.8.0.4"
+isort = "^5.12.0"
+pre-commit = "^2.20.0"
+autoflake = "^1.5.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 120
+target-version = ["py39"]
