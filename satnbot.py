@@ -1,11 +1,16 @@
 import csv
 import os
+import json
+import re
 
 import discord
 import openai
 import requests
 from bs4 import BeautifulSoup
 from discord.ext import commands
+from utils import download_from, pdf2text, chunk_text
+from typing import List
+from cleantext import clean
 
 # Load environment variables
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
@@ -128,34 +133,121 @@ async def scrape_y_finance(ctx, format: str = "human-readable", ticker_count: in
         # area=ctx.message.channel
         await ctx.send("Download file!", file=discord.File(f"output.{f_ext}"))
 
+class TagFilter(commands.Converter):
+    async def convert(self, ctx, *tags):
+        filter = "|".join(tags)
+        if not filter:
+            filter = "cs.AI"
+        return filter
+
+@bot.slash_command(pass_context=True, name="axs")
+async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 3):
+    await ctx.defer()
+
+    url = 'http://www.arxiv-sanity.com/top?timefilter=year&vfilter=all'
+    # url = 'https://arxiv-sanity-lite.com/?q=&rank=time&tags=&pid=&time_filter=3&svm_c=0.01&skip_have=no'
+    res = requests.get(url)
+    text = res.text
+
+    soup=BeautifulSoup(text, "html.parser")
+    script = soup.find(lambda tag: tag.name == 'script' and 'var papers =' in tag.text)
+    start = script.text.index('[')
+    end = script.text.rfind(']')
+    json_data = script.text[start:end]
+    var_tags_idx = json_data.rfind("var tags")
+
+    json_data = json_data[:var_tags_idx-2]
+    print(json_data)
+    papers = json.loads(json_data)
+
+    filtered_no = 0
+    output_string = f"\n**Last {filter_count} papers on {filter_tags} from arxiv sanity**\n\n"
+    for paper in papers:
+        if re.search(filter_tags, paper['tags']):
+            title = paper['title']
+            print(f"Adding paper: {title}")
+            authors = paper['authors']
+            paper_id = paper['id']
+            tags = paper['tags']
+            paper_template = f"""
+                **[{title}](https://arxiv.org/abs/{paper_id})**
+                Authors: _{authors}_
+                Arxiv ID: {paper_id}
+                Tags: {tags}
+            """
+            output_string += paper_template
+            filtered_no += 1
+        if filtered_no == filter_count:
+            break
+    print(f"Discord Text Length: {len(output_string)}. Will be cut to 2000")
+    await ctx.respond(output_string[:2000])
+
+def clean_text(text: str, lang: str="en") -> str:
+    cleaned_text = clean(
+        text,
+        fix_unicode=True,
+        to_ascii=True,
+        lower=False,
+        normalize_whitespace=True,
+        no_line_breaks=False,
+        strip_lines=True,
+        keep_two_line_breaks=False,
+        no_urls=True,
+        no_emails=True,
+        no_phone_numbers=False,
+        no_numbers=False,
+        no_digits=False,
+        no_currency_symbols=False,
+        no_punct=False,
+        no_emoji=True,
+        replace_with_url="<URL>",
+        replace_with_email="<EMAIL>",
+        replace_with_phone_number="<PHONE>",
+        replace_with_number="<NUMBER>",
+        replace_with_digit="0",
+        replace_with_currency_symbol="<CUR>",
+        replace_with_punct="",
+        lang=lang,
+    )
+    return cleaned_text
+
 
 @bot.slash_command(pass_context=True, name="ax")
-async def arxiv_summary(ctx, arxiv_id: str = "1605.08386v1"):
-    from utils import download_from, pdf2text, chunk_text
+async def arxiv_summary(ctx, arxiv_id: str = "1706.03762", language: str = "english", style: str = "paragraph", style_items: int = 1, chunks:int = 10, chars_per_chunk:int=1024):  # Transformers paper arxiv
     await ctx.defer()
     paper = download_from(arxiv_id)
     title = paper.title
     print(f"Paper title: {title}")
     whole_text = pdf2text("downloaded-paper.pdf")
-    chunks = chunk_text(whole_text, chunk_len=1024)
-    print(f"Chunks: {len(chunks)} Sending 10 to Chat GPT")
-    chat_gpt_text = " ".join(chunks[:10])
+    chunk_list = chunk_text(whole_text, chunk_len=chars_per_chunk)
+    total_chars = chunks * chars_per_chunk
+    print(f"Chunks: {len(chunk_list)}\nSending {chunks} of {chars_per_chunk} chars each to Chat GPT (Total ~{total_chars})")
+    chat_gpt_text = " ".join(chunk_list[:chunks])
+    chat_gpt_text = clean_text(chat_gpt_text)
+    if style == "paragraph":
+        summary_style = f"{style_items} paragraph"
+    elif style == "bulletpoints":
+        summary_style = f"{style_items} bullet points"
+    elif style == "sonnet":
+        summary_style = "a sonnet style"
+    else:
+        summary_style = "a single sentence"
     prompt = f""""
-Please, summarize this paper:\n
-{chat_gpt_text}
-"""
+        Please, summarize this paper in {language} in {summary_style}:
+        {chat_gpt_text}
+        """
+    print(f"Len prompt {len(chat_gpt_text)}, words {len(prompt.split())}")
     input_content = [{"role": "user", "content": prompt}]
     completion = openai.ChatCompletion.create(model=model_id, messages=input_content)
     cgpt_summary = completion.choices[0].message.content
-    print(f"Text: {cgpt_summary}")
-    summary = f""""
-Paper downloaded!: {title}
-SUMMARY\n
--------\n
+    print(f"Text ({len(cgpt_summary)}): {cgpt_summary}")
+    summary = f"""
+\n\n
+**{title}**\n
+_SUMMARY in {language} ({summary_style})_\n
 {cgpt_summary}
     """
-    print("KK")
-    await ctx.respond(summary)
-    
+    print(f"Discord Text Length: {len(summary)}. Will be cut to 2000")
+    await ctx.respond(summary[:2000])
 
 bot.run(DISCORD_TOKEN)
