@@ -1,18 +1,16 @@
 import csv
-import os
 import json
-import re
+import os
 import pickle
-
 
 import discord
 import openai
 import requests
 from bs4 import BeautifulSoup
-from discord.ext import commands
-from utils import download_from, pdf2text, chunk_text
-from typing import List
 from cleantext import clean
+from discord.ext import commands
+
+from utils import chunk_text, download_from, pdf2text
 
 # Load environment variables
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
@@ -28,12 +26,13 @@ intents.message_content = True
 
 history_file = "history.pkl"
 
+
 class DiscordChatGPT4(commands.Bot):
     def __init__(self, intents):
         super().__init__(intents)
         try:
             print(f"Loading command history from {history_file}")
-            with open(history_file, 'rb') as file:
+            with open(history_file, "rb") as file:
                 self.history = pickle.load(file)
                 print(self.history)
         except FileNotFoundError:
@@ -43,11 +42,11 @@ class DiscordChatGPT4(commands.Bot):
 
     def save_history(self):
         print(self.history)
-        with open(history_file, 'wb') as file:
+        with open(history_file, "wb") as file:
             pickle.dump(self.history, file)
 
     def add_to_history(self, c):
-        self.history[len(self.history)+1] = c
+        self.history[len(self.history) + 1] = c
 
     def get_history(self):
         return self.history
@@ -100,7 +99,7 @@ async def history(ctx):
     history_items = bot.get_history().items()
     items_list = []
     for k, v in history_items:
-        content = v[0]['content']
+        content = v[0]["content"]
         if len(content) > 15:
             content = content[:15] + "..."
         items_list.append(f"{k}: {content}")
@@ -162,44 +161,47 @@ async def scrape_y_finance(ctx, format: str = "human-readable", ticker_count: in
         # area=ctx.message.channel
         await ctx.send("Download file!", file=discord.File(f"output.{f_ext}"))
 
+
 class TagFilter(commands.Converter):
     async def convert(self, ctx, tags):
         filter = tags.split("&")
         print(f"filter: {filter}")
         return filter
 
+
 def check_substrings(main_string, substrings):
     return all(substring in main_string for substring in substrings)
+
 
 @bot.slash_command(pass_context=True, name="axs")
 async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 3):
     await ctx.defer()
 
-    url = 'http://www.arxiv-sanity.com/top?timefilter=year&vfilter=all'
+    url = "http://www.arxiv-sanity.com/top?timefilter=year&vfilter=all"
     # url = 'https://arxiv-sanity-lite.com/?q=&rank=time&tags=&pid=&time_filter=3&svm_c=0.01&skip_have=no'
     res = requests.get(url)
     text = res.text
 
-    soup=BeautifulSoup(text, "html.parser")
-    script = soup.find(lambda tag: tag.name == 'script' and 'var papers =' in tag.text)
-    start = script.text.index('[')
-    end = script.text.rfind(']')
+    soup = BeautifulSoup(text, "html.parser")
+    script = soup.find(lambda tag: tag.name == "script" and "var papers =" in tag.text)
+    start = script.text.index("[")
+    end = script.text.rfind("]")
     json_data = script.text[start:end]
     var_tags_idx = json_data.rfind("var tags")
 
-    json_data = json_data[:var_tags_idx-2]
+    json_data = json_data[: var_tags_idx - 2]
     # print(json_data)
     papers = json.loads(json_data)
 
     filtered_no = 0
     output_string = f"\n**Last {filter_count} papers on {filter_tags} from arxiv sanity**\n\n"
     for paper in papers:
-        if check_substrings(paper['tags'], filter_tags):
-            title = paper['title']
+        if check_substrings(paper["tags"], filter_tags):
+            title = paper["title"]
             print(f"Adding paper: {title}")
-            authors = paper['authors']
-            paper_id = paper['id']
-            tags = paper['tags']
+            authors = paper["authors"]
+            paper_id = paper["id"]
+            tags = paper["tags"]
             paper_template = f"""
                 **[{title}](https://arxiv.org/abs/{paper_id})**
                 Authors: _{authors}_
@@ -213,7 +215,8 @@ async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 
     print(f"Discord Text Length: {len(output_string)}. Will be cut to 2000")
     await ctx.respond(output_string[:2000])
 
-def clean_text(text: str, lang: str="en") -> str:
+
+def clean_text(text: str, lang: str = "en") -> str:
     cleaned_text = clean(
         text,
         fix_unicode=True,
@@ -244,7 +247,15 @@ def clean_text(text: str, lang: str="en") -> str:
 
 
 @bot.slash_command(pass_context=True, name="ax")
-async def arxiv_summary(ctx, arxiv_id: str = "1706.03762", language: str = "english", style: str = "paragraph", style_items: int = 1, chunks:int = 10, chars_per_chunk:int=1024):  # Transformers paper arxiv
+async def arxiv_summary(
+    ctx,
+    arxiv_id: str = "1706.03762",
+    language: str = "english",
+    style: str = "paragraph",
+    style_items: int = 1,
+    chunks: int = 10,
+    chars_per_chunk: int = 1024,
+):  # Transformers paper arxiv
     await ctx.defer()
     paper = download_from(arxiv_id)
     title = paper.title
@@ -252,7 +263,9 @@ async def arxiv_summary(ctx, arxiv_id: str = "1706.03762", language: str = "engl
     whole_text = pdf2text("downloaded-paper.pdf")
     chunk_list = chunk_text(whole_text, chunk_len=chars_per_chunk)
     total_chars = chunks * chars_per_chunk
-    print(f"Chunks: {len(chunk_list)}\nSending {chunks} of {chars_per_chunk} chars each to Chat GPT (Total ~{total_chars})")
+    print(
+        f"Chunks: {len(chunk_list)}\nSending {chunks} of {chars_per_chunk} chars each to Chat GPT (Total ~{total_chars})"
+    )
     chat_gpt_text = " ".join(chunk_list[:chunks])
     chat_gpt_text = clean_text(chat_gpt_text)
     if style == "paragraph":
@@ -280,5 +293,6 @@ _SUMMARY in {language} ({summary_style})_\n
     """
     print(f"Discord Text Length: {len(summary)}. Will be cut to 2000")
     await ctx.respond(summary[:2000])
+
 
 bot.run(DISCORD_TOKEN)
