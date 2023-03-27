@@ -134,11 +134,13 @@ async def scrape_y_finance(ctx, format: str = "human-readable", ticker_count: in
         await ctx.send("Download file!", file=discord.File(f"output.{f_ext}"))
 
 class TagFilter(commands.Converter):
-    async def convert(self, ctx, *tags):
-        filter = "|".join(tags)
-        if not filter:
-            filter = "cs.AI"
+    async def convert(self, ctx, tags):
+        filter = tags.split("&")
+        print(f"filter: {filter}")
         return filter
+
+def check_substrings(main_string, substrings):
+    return all(substring in main_string for substring in substrings)
 
 @bot.slash_command(pass_context=True, name="axs")
 async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 3):
@@ -157,13 +159,13 @@ async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 
     var_tags_idx = json_data.rfind("var tags")
 
     json_data = json_data[:var_tags_idx-2]
-    print(json_data)
+    # print(json_data)
     papers = json.loads(json_data)
 
     filtered_no = 0
     output_string = f"\n**Last {filter_count} papers on {filter_tags} from arxiv sanity**\n\n"
     for paper in papers:
-        if re.search(filter_tags, paper['tags']):
+        if check_substrings(paper['tags'], filter_tags):
             title = paper['title']
             print(f"Adding paper: {title}")
             authors = paper['authors']
