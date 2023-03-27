@@ -5,7 +5,7 @@
 * Python - to run things
 * pyenv/poetry - to ease/automate the cumbersome things in the previous point
 * [discord account](https://discord.com/) - to chat with things and optionally ppl
-* [discord developer account](https://discord.com/developers) - to depelop things and, in the future, people you like more
+* [discord developer account](https://discord.com/developers) - to depelop parrot-like things and, in the future, people you like more
 * [open ai account](https://platform.openai.com/) - to empty your pocket
 * will - to... whatever you want
 
