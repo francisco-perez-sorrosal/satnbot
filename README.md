@@ -29,8 +29,11 @@ I'm assuming you have your fancy Discord account! 😃
 1. Create your server where to chat with your bot
 2. Create your applicatoin/bot in the [Discord Dev Portal](https://discord.com/developers)
 3. Assign the right permissions to let your bot do things! 🥶
-4. Generate the url and invite your bot to your server!
-5. In your server, add the permissions to the commands that the bot registers 🧐 (e.g. /syf)
+
+    3.1. In OAuth2's URL generator, select the scopes (e.g. `bot` and `application.command`)
+    3.2 Then select the bot permissions (e.g. `administrator`)
+4. Copy the generated url and invite your bot to your server!
+5. In your server, add the permissions to the slash commands (see below) that the bot registers (Server Settings/Integrations) 🧐 (e.g. /syf)
 5. Use it!
 
 ## Slack
@@ -47,6 +50,15 @@ OPENAI_API_KEY="<YOUR_OPENAI_KEY_HERE>"
 ```sh
 ./tdb.sh
 ```
+
+## NOTE
+
+**Bear in mind when using the bot capabilities below that**:
+* Input/Output to/from OpenAI's ChatGPT is limited to a certain number of tokens (depending on the model)
+* Discord's bot Output is limited to 2000 chars. 
+
+Both limitations can be workaround but this is not done at this point. [Will be addressed later](https://github.com/francisco-perez-sorrosal/satnbot/issues)
+
 
 ## What/How to Use It?
 
@@ -81,12 +93,43 @@ By default you get a human readable output...
 
 ![SYF](images/basics_syf_tsv.png)
 
-In summary, basically this does to do what this poor guy (representing many of us) had to do very painfully [here](https://github.com/DeBeersN/Web-scraping-Yahoo-Finance-using-requests-and-Beautiful-Soup/blob/main/web-scraping-with-python-project.ipynb)
+In summary, basically this does to do what this engineer/scientist (representing many of us) had to do very painfully [here](https://github.com/DeBeersN/Web-scraping-Yahoo-Finance-using-requests-and-Beautiful-Soup/blob/main/web-scraping-with-python-project.ipynb)
 
-### As a...
-More to come
+### As an arxiv helper!
+
+**Important Note** When passing the text extracted from the pdf document to the bot with the `/ax` command input has to be limited when sending it to ChatGPT. This can be done with the parameters `chunks` and `chars_per_chunk` available in the slash command.
+
+You can use the bot also with the slash command `/axs` (arxiv sanity) to access the latest articles in the topic you specify:
+
+```discord
+/axs filter_tags cs.AI
+```
+
+Or you can retrieve stuff on two+ different topics:
+```discord
+/axs filter_tags cs.AI&cs.CV
+```
+
+![SYF](images/basics_axs.png)
+
+Then you can copy the Arxiv ID and then use the `/ax` (arxiv) slash command to retrieve a summary of the article:
+
+```discord
+/ax arxiv_id: 2202.02098
+```
+
+You can specify also the `language` (english is default) in which you want the summary and the `style` (paragraph(default)|bulletpoints|sonnet) and number of `style_items`
+
+```discord
+/ax arxiv_id: 2202.02098 language: english style: bulletpoints style_items: 10
+```
+![SYF](images/basics_ax1.png)
+
+```discord
+/ax arxiv_id:2202.02098 language:spanish style:paragraph style_items:2
+```
+![SYF](images/basics_ax2.png)
 
 ## TODOs
 
 For things here to do before I grow old or before I die see [this](https://github.com/francisco-perez-sorrosal/satnbot/milestones).
-
