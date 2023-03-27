@@ -79,7 +79,6 @@ There's also a slash command (`/history`) to check the history or requests...
 
 ...so you can ask again (with `/h <idx_no>`) to get another thrilling response..
 ![History Resend](images/basics_history_resend.png)
-Although in this case literally blows because [there's a Heissenbug](https://github.com/francisco-perez-sorrosal/satnbot/issues/1) that I have to fix.
 
 ### As a Stock Ticker extractor
 
