@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import pickle
+from typing import List
 
 import discord
 import openai
@@ -12,6 +13,7 @@ from discord.ext import commands
 
 from utils import chunk_text, download_from, pdf2text
 
+DISCORD_CHUNK_LEN = 2000
 # Load environment variables
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
@@ -92,6 +94,18 @@ class DiscordChatGPT4(commands.Bot):
 bot = DiscordChatGPT4(intents=intents)
 
 
+async def discord_multi_response(ctx, chunks: List[str]):
+    print(f"Sendng {len(chunks)} chunks")
+    for chunk in chunks:
+        try:
+            assert len(chunk) <= DISCORD_CHUNK_LEN
+            print(f"Sendng chunks of {len(chunk)} chars")
+            await ctx.respond(chunk)
+        except AssertionError:
+            print(f"Cutting chunk:\n{chunk}\n\nto:\n{chunk[:DISCORD_CHUNK_LEN]}")
+            await ctx.respond(chunk[:DISCORD_CHUNK_LEN])
+
+
 # Commands
 @bot.slash_command(name="history")
 async def history(ctx):
@@ -100,11 +114,12 @@ async def history(ctx):
     items_list = []
     for k, v in history_items:
         content = v[0]["content"]
-        if len(content) > 15:
-            content = content[:15] + "..."
+        if len(content) > 50:
+            content = content[:50] + "..."
         items_list.append(f"{k}: {content}")
     chat_gpt_cmd_history = "\n".join(items_list)
-    await ctx.respond(chat_gpt_cmd_history)
+    chunk_list = chunk_text(chat_gpt_cmd_history, chunk_len=DISCORD_CHUNK_LEN)
+    await discord_multi_response(ctx, chunk_list)
 
 
 @bot.slash_command(name="h")
