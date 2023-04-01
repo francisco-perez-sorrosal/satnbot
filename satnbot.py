@@ -4,12 +4,13 @@ import os
 import pickle
 from typing import List
 
+import asyncio
 import discord
 import openai
 import requests
 from bs4 import BeautifulSoup
 from cleantext import clean
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import chunk_text, download_from, pdf2text
 
@@ -104,23 +105,32 @@ class DiscordChatGPT4(commands.Bot):
 
         response = completion.choices[0].message.content
         print(f"Text ({len(response)}): {response}")
-        await message.channel.send(response[:2000])
+        # await message.channel.send(response[:2000])
+        chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
+        ctx = await self.get_context(message)
+        await discord_multi_response(ctx, chunk_list)
 
 
 # Create and run DisordChatGPT4 instance
 bot = DiscordChatGPT4(intents=intents)
 
 
-async def discord_multi_response(ctx, chunks: List[str]):
+async def discord_multi_response(ctx, chunks: List[str], is_send: bool = True):
     print(f"Sendng {len(chunks)} chunks")
     for chunk in chunks:
         try:
             assert len(chunk) <= DISCORD_CHUNK_LEN
             print(f"Sendng chunks of {len(chunk)} chars")
-            await ctx.respond(chunk)
+            if is_send:
+                await ctx.send(chunk)
+            else:
+                await ctx.respond(chunk)
         except AssertionError:
             print(f"Cutting chunk:\n{chunk}\n\nto:\n{chunk[:DISCORD_CHUNK_LEN]}")
-            await ctx.respond(chunk[:DISCORD_CHUNK_LEN])
+            if is_send:
+                await ctx.send(chunk[:DISCORD_CHUNK_LEN])
+            else:
+                await ctx.respond(chunk[:DISCORD_CHUNK_LEN])
 
 
 # Commands
@@ -136,8 +146,11 @@ async def history(ctx):
         items_list.append(f"{k}: {content}")
     chat_gpt_cmd_history = "\n".join(items_list)
     chunk_list = chunk_text(chat_gpt_cmd_history, chunk_len=DISCORD_CHUNK_LEN)
-    await discord_multi_response(ctx, chunk_list)
+    await discord_multi_response(ctx, chunk_list, is_send=False)
 
+
+# async def on_member_join(member):
+#     await ctx.send(me)
 
 @bot.slash_command(name="h")
 async def history_command(ctx, idx: int):
@@ -150,7 +163,8 @@ async def history_command(ctx, idx: int):
     else:
         completion = openai.ChatCompletion.create(model=model_id, messages=input_content)
         response = completion.choices[0].message.content
-        await ctx.respond(response[:2000])
+        chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
+        await discord_multi_response(ctx, chunk_list, is_send=False)
 
 
 @bot.slash_command(pass_context=True, name="syf")
@@ -188,7 +202,8 @@ async def scrape_y_finance(ctx, format: str = "human-readable", ticker_count: in
             csv_output.writerow(line_elems)
     print(response)
     if format == "human-readable":
-        await ctx.respond(response)
+        chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
+        await discord_multi_response(ctx, chunk_list, is_send=False)
     else:
         # area=ctx.message.channel
         await ctx.send("Download file!", file=discord.File(f"output.{f_ext}"))
@@ -245,7 +260,8 @@ async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 
         if filtered_no == filter_count:
             break
     print(f"Discord Text Length: {len(output_string)}. Will be cut to 2000")
-    await ctx.respond(output_string[:2000])
+    chunk_list = chunk_text(output_string, chunk_len=DISCORD_CHUNK_LEN)
+    await discord_multi_response(ctx, chunk_list, is_send=False)
 
 
 def clean_text(text: str, lang: str = "en") -> str:
@@ -324,7 +340,8 @@ _SUMMARY in {language} ({summary_style})_\n
 {cgpt_summary}
     """
     print(f"Discord Text Length: {len(summary)}. Will be cut to 2000")
-    await ctx.respond(summary[:2000])
+    chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
+    await discord_multi_response(ctx, chunk_list, is_send=False)
 
 
 bot.run(DISCORD_TOKEN)
