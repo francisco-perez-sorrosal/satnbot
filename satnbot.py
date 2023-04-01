@@ -2,7 +2,6 @@ import asyncio
 import csv
 import json
 import os
-import pickle
 from typing import List
 
 import discord
@@ -12,6 +11,7 @@ from bs4 import BeautifulSoup
 from cleantext import clean
 from discord.ext import commands, tasks
 
+from history import ChatHistory
 from utils import chunk_text, download_from, pdf2text
 
 DISCORD_CHUNK_LEN = 2000
@@ -33,26 +33,7 @@ history_file = "history.pkl"
 class DiscordChatGPT4(commands.Bot):
     def __init__(self, intents):
         super().__init__(intents)
-        try:
-            print(f"Loading command history from {history_file}")
-            with open(history_file, "rb") as file:
-                self.history = pickle.load(file)
-                print(self.history)
-        except FileNotFoundError:
-            print("No history!")
-            self.history = {}
-        # self.history = []
-
-    def save_history(self):
-        print(self.history)
-        with open(history_file, "wb") as file:
-            pickle.dump(self.history, file)
-
-    def add_to_history(self, c):
-        self.history[len(self.history) + 1] = c
-
-    def get_history(self):
-        return self.history
+        self.history = ChatHistory(history_file)
 
     @tasks.loop()
     async def status_task(self) -> None:
@@ -75,7 +56,7 @@ class DiscordChatGPT4(commands.Bot):
         print(self.user.name)
         print(self.user.id)
         print("------")
-        self.status_task.start()
+        # self.status_task.start()
 
     async def on_message(self, message: discord.message.Message):
         if message.author == self.user and "@myself" not in message.content:
@@ -96,19 +77,30 @@ class DiscordChatGPT4(commands.Bot):
         if message.attachments:
             image_content = message.attachments[0].url
 
-        input_content = [{"role": "user", "content": text_content}]
+        session = self.history.get_session("default")
+        input_content = {"role": "user", "content": text_content}
+        self.history.add_to_session("default", input_content)
+        session.append(input_content)
         if image_content:
-            input_content[0]["content"]["image"] = image_content
+            session[-1]["content"]["image"] = image_content
 
-        completion = openai.ChatCompletion.create(model=model_id, messages=input_content)
-        self.add_to_history(input_content)
-        self.save_history()  # TODO Improve this
+        completion = openai.ChatCompletion.create(model=model_id, messages=session)
+        print(f"Message received {completion.choices[0].message}")
+        self.history.add_to_session("default", completion.choices[0].message)
+        self.history.save_history()  # TODO Improve this
 
         response = completion.choices[0].message.content
         print(f"Text ({len(response)}): {response}")
         # await message.channel.send(response[:2000])
         chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
-        ctx = await self.get_context(message)
+        print("*" * 100)
+        print(f"msg: {message}")
+        print("=" * 100)
+        print(f"completion msg: {completion.choices[0].message}")
+        if message.author.id == self.user.id:
+            ctx = await self.get_context(message)
+        else:
+            ctx = message.channel
         await discord_multi_response(ctx, chunk_list)
 
 
