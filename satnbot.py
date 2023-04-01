@@ -53,14 +53,30 @@ class DiscordChatGPT4(commands.Bot):
     def get_history(self):
         return self.history
 
+
+    @tasks.loop()
+    async def status_task(self) -> None:
+        # self._get_websocket()
+        # bot.fetch_webhook()
+        channel = self.get_channel(1086445347997503512)
+        print(f"Sending recurrent message to channel {channel} after 30 secs")
+        await channel.send(f"""
+        <@{self.user.id}> @myself return one of these 4 things at random:
+        1) a useful Python trick
+        2) a best practice in Python
+        3) a popular code snippet in Python explained
+        4) a common mistake in Python and how to avoid it""")
+        await asyncio.sleep(30)
+
     async def on_ready(self):
         print("Logged in as")
         print(self.user.name)
         print(self.user.id)
         print("------")
+        self.status_task.start()
 
-    async def on_message(self, message):
-        if message.author == self.user:
+    async def on_message(self, message: discord.message.Message):
+        if message.author == self.user and "@myself" not in message.content:
             return
 
         # Check if the message contains a mention of the bot
@@ -70,6 +86,7 @@ class DiscordChatGPT4(commands.Bot):
 
         # Remove the bot mention from the message content
         text_content = message.content.replace(bot_mention, "").strip()
+        text_content = text_content.replace("@myself", "")
 
         print(f"User message: {text_content} {type(text_content)}")
 
