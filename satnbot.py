@@ -1,10 +1,10 @@
+import asyncio
 import csv
 import json
 import os
 import pickle
 from typing import List
 
-import asyncio
 import discord
 import openai
 import requests
@@ -54,19 +54,20 @@ class DiscordChatGPT4(commands.Bot):
     def get_history(self):
         return self.history
 
-
     @tasks.loop()
     async def status_task(self) -> None:
         # self._get_websocket()
         # bot.fetch_webhook()
         channel = self.get_channel(1086445347997503512)
         print(f"Sending recurrent message to channel {channel} after 30 secs")
-        await channel.send(f"""
+        await channel.send(
+            f"""
         <@{self.user.id}> @myself return one of these 4 things at random:
         1) a useful Python trick
         2) a best practice in Python
         3) a popular code snippet in Python explained
-        4) a common mistake in Python and how to avoid it""")
+        4) a common mistake in Python and how to avoid it"""
+        )
         await asyncio.sleep(30)
 
     async def on_ready(self):
@@ -151,6 +152,7 @@ async def history(ctx):
 
 # async def on_member_join(member):
 #     await ctx.send(me)
+
 
 @bot.slash_command(name="h")
 async def history_command(ctx, idx: int):

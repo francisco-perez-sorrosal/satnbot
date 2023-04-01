@@ -55,7 +55,7 @@ OPENAI_API_KEY="<YOUR_OPENAI_KEY_HERE>"
 
 **Bear in mind when using the bot capabilities below that**:
 * Input/Output to/from OpenAI's ChatGPT is limited to a certain number of tokens (depending on the model)
-* Discord's bot Output is limited to 2000 chars. 
+* Discord's bot Output is limited to 2000 chars.
 
 Both limitations can be workaround but this is not done at this point. [Will be addressed later](https://github.com/francisco-perez-sorrosal/satnbot/issues)
 
