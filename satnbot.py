@@ -12,6 +12,7 @@ from cleantext import clean
 from discord.ext import commands, tasks
 
 from history import ChatHistory
+from search import SearchEngine
 from utils import chunk_text, download_from, pdf2text
 
 DISCORD_CHUNK_LEN = 2000
@@ -28,6 +29,8 @@ intents.messages = True
 intents.message_content = True
 
 history_file = "history.pkl"
+
+search_engine = SearchEngine()
 
 
 class DiscordChatGPT4(commands.Bot):
@@ -144,6 +147,20 @@ async def history(ctx):
 
 # async def on_member_join(member):
 #     await ctx.send(me)
+
+
+@bot.slash_command(name="s")
+async def search_command(ctx, q: str):
+    await ctx.defer()
+    print(f"Search query: {q}")
+    query_result = search_engine.query(q)
+    print(f"Query result metadata: {query_result.meta}")
+    if not query_result.text:
+        await ctx.respond("No results!")
+    else:
+        response = query_result.text
+        chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
+        await discord_multi_response(ctx, chunk_list, is_send=False)
 
 
 @bot.slash_command(name="h")
