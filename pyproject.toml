@@ -16,6 +16,10 @@ beautifulsoup4 = "^4.12.0"
 arxiv = "^1.4.3"
 pdfminer-six = "^20221105"
 clean-text = "^0.6.0"
+langchain = "^0.0.152"
+pinecone-client = {extras = ["grpc"], version = "^2.2.1"}
+coloredlogs = "^15.0.1"
+click = "^8.1.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.8.0"
@@ -37,3 +41,6 @@ profile = "black"
 [tool.black]
 line-length = 120
 target-version = ["py39"]
+
+[tool.poetry.scripts]
+doc_loader = 'document_loader:main'

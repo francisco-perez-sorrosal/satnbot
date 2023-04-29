@@ -129,6 +129,26 @@ You can specify also the `language` (english is default) in which you want the s
 ```
 ![SYF](images/basics_ax2.png)
 
+## Pinecone embeddings
+
+Create index:
+```sh
+poetry run doc_loader index create --name satnbot-idx --url https://python.langchain.com/en/latest/modules
+```
+
+Use index:
+```sh
+poetry run doc_loader index use
+```
+
+To check the options:
+
+```sh
+poetry run doc_loader index
+```
+
+
+
 ## TODOs
 
 For things here to do before I grow old or before I die see [this](https://github.com/francisco-perez-sorrosal/satnbot/milestones).
