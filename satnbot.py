@@ -10,8 +10,11 @@ import requests
 from bs4 import BeautifulSoup
 from cleantext import clean
 from discord.ext import commands, tasks
+from langchain.chains import ConversationChain
+from langchain.llms import OpenAI
 
-from history import ChatHistory
+# from history import ChatHistory
+from memory import Memory
 from utils import chunk_text, download_from, pdf2text
 
 DISCORD_CHUNK_LEN = 2000
@@ -24,16 +27,22 @@ model_id = "gpt-3.5-turbo"
 # model_id="gpt-4"
 
 intents = discord.Intents.all()
+intents.members = True
 intents.messages = True
 intents.message_content = True
+intents.guild_messages = True
 
-history_file = "history.pkl"
+memory_file = "memory.pkl"
 
 
 class DiscordChatGPT4(commands.Bot):
     def __init__(self, intents):
         super().__init__(intents)
-        self.history = ChatHistory(history_file)
+        llm = OpenAI(openai_api_key=OPENAI_API_KEY, model_name=model_id, temperature=0)
+        self.memory = Memory(memory_file)
+        self.conversation = ConversationChain(
+            llm=llm, verbose=True, memory=self.memory.episodic  # We pass only the episodic part of the global memory
+        )
 
     @tasks.loop()
     async def status_task(self) -> None:
@@ -52,51 +61,56 @@ class DiscordChatGPT4(commands.Bot):
         await asyncio.sleep(30)
 
     async def on_ready(self):
-        print("Logged in as")
-        print(self.user.name)
-        print(self.user.id)
-        print("------")
+        print(f"------\nLogged in as {self.user.name} ({self.user.id})\n------")
         # self.status_task.start()
 
     async def on_message(self, message: discord.message.Message):
         if message.author == self.user and "@myself" not in message.content:
             return
 
+        # TODO: Remove as we don't want to specify the name of the bot to chat in the chatbot channel (can't figure it out in Discord yet)
         # Check if the message contains a mention of the bot
         bot_mention = f"<@{self.user.id}>"
         if bot_mention not in message.content:
             return
 
+        print(message.channel.id)
+        print(message.content)
+        print(message)
+
+        # for m in list(message.channel.history(limit=10)):
+        #     print(m)
+        if message.channel.name != "chatbot":
+            print("Chat with AI only in the 'chatbot' channel!")
+            return
+
         # Remove the bot mention from the message content
-        text_content = message.content.replace(bot_mention, "").strip()
+        bot_mention = f"<@{self.user.id}>"
+        text_content = message.content
+        if bot_mention in message.content:
+            text_content = message.content.replace(bot_mention, "").strip()
+        print(text_content)
         text_content = text_content.replace("@myself", "")
 
         print(f"User message: {text_content} {type(text_content)}")
 
-        image_content = None
+        image_content = None  # TODO add multimodal content
         if message.attachments:
-            image_content = message.attachments[0].url
+            message.attachments[0].url
 
-        session = self.history.get_session("default")
-        input_content = {"role": "user", "content": text_content}
-        self.history.add_to_session("default", input_content)
-        session.append(input_content)
-        if image_content:
-            session[-1]["content"]["image"] = image_content
+        output = self.conversation.predict(input=text_content)
 
-        completion = openai.ChatCompletion.create(model=model_id, messages=session)
-        print(f"Message received {completion.choices[0].message}")
-        self.history.add_to_session("default", completion.choices[0].message)
-        self.history.save_history()  # TODO Improve this
+        print(f"Message received {output}")
+        self.memory.save_memory()  # TODO Improve this
+        print(f"History:\n{self.memory}")
 
-        response = completion.choices[0].message.content
+        response = output
         print(f"Text ({len(response)}): {response}")
         # await message.channel.send(response[:2000])
         chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
         print("*" * 100)
         print(f"msg: {message}")
         print("=" * 100)
-        print(f"completion msg: {completion.choices[0].message}")
         if message.author.id == self.user.id:
             ctx = await self.get_context(message)
         else:
@@ -130,13 +144,14 @@ async def discord_multi_response(ctx, chunks: List[str], is_send: bool = True):
 @bot.slash_command(name="history")
 async def history(ctx):
     print(f"Requesting history")
-    history_items = bot.get_history().items()
+    history_items = bot.memory.episodic.chat_memory.messages
+    print(history_items)
     items_list = []
-    for k, v in history_items:
-        content = v[0]["content"]
+    for i, e in enumerate(history_items):
+        content = f"{e.content}"
         if len(content) > 50:
             content = content[:50] + "..."
-        items_list.append(f"{k}: {content}")
+        items_list.append(f"{i}. [{e.type}]: {content}")
     chat_gpt_cmd_history = "\n".join(items_list)
     chunk_list = chunk_text(chat_gpt_cmd_history, chunk_len=DISCORD_CHUNK_LEN)
     await discord_multi_response(ctx, chunk_list, is_send=False)
@@ -149,14 +164,13 @@ async def history(ctx):
 @bot.slash_command(name="h")
 async def history_command(ctx, idx: int):
     await ctx.defer()
-    print(f"Requesting history index: {idx} on:\n{bot.history}")
-    input_content = bot.get_history().get(idx, None)
-    print(f"\n\n\nInput content: {input_content}\n\n\nType: {type(input_content)}")
+    print(f"Requesting history index: {idx} on:\n{bot.memory}")
+    input_content = bot.memory.episodic.chat_memory.messages[idx]
+    print(f"\n\n\nInput content: {input_content.content}\n\n\nType: {type(input_content)}")
     if not input_content:
         await ctx.respond("History is empty!")
     else:
-        completion = openai.ChatCompletion.create(model=model_id, messages=input_content)
-        response = completion.choices[0].message.content
+        response = bot.conversation.predict(input=input_content.content)
         chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
         await discord_multi_response(ctx, chunk_list, is_send=False)
 

@@ -27,7 +27,7 @@ poetry install
 I'm assuming you have your fancy Discord account! 😃
 
 1. Create your server where to chat with your bot
-2. Create your applicatoin/bot in the [Discord Dev Portal](https://discord.com/developers)
+2. Create your application/bot in the [Discord Dev Portal](https://discord.com/developers)
 3. Assign the right permissions to let your bot do things! 🥶
 
     3.1. In OAuth2's URL generator, select the scopes (e.g. `bot` and `application.command`)
