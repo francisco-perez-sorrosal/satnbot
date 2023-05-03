@@ -2,7 +2,8 @@ import re
 from io import StringIO
 from typing import BinaryIO, List, cast
 
-import arxiv
+import openai
+from cleantext import clean
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
@@ -10,12 +11,7 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.utils import FileOrName, open_filename
 
 
-def download_from(arxiv_id: str, filename="downloaded-paper.pdf"):
-    paper = next(arxiv.Search(id_list=[arxiv_id]).results())
-    paper.download_pdf(filename=filename)
-    return paper
-
-
+# TODO Remove if dependency on langchain stays
 def pdf2text(pdf_file: FileOrName):
     # pdfminer Boilerplate
     rsrcmgr = PDFResourceManager()
@@ -51,3 +47,43 @@ def chunk_text(text: str, chunk_len: int = 256, do_overlap: bool = False, overla
         else:
             i = i + chunk_len
     return chunks
+
+
+def clean_text(text: str, lang: str = "en") -> str:
+    cleaned_text = clean(
+        text,
+        fix_unicode=True,
+        to_ascii=True,
+        lower=False,
+        normalize_whitespace=True,
+        no_line_breaks=False,
+        strip_lines=True,
+        keep_two_line_breaks=False,
+        no_urls=True,
+        no_emails=True,
+        no_phone_numbers=False,
+        no_numbers=False,
+        no_digits=False,
+        no_currency_symbols=False,
+        no_punct=False,
+        no_emoji=True,
+        replace_with_url="<URL>",
+        replace_with_email="<EMAIL>",
+        replace_with_phone_number="<PHONE>",
+        replace_with_number="<NUMBER>",
+        replace_with_digit="0",
+        replace_with_currency_symbol="<CUR>",
+        replace_with_punct="",
+        lang=lang,
+    )
+    return cleaned_text
+
+
+def get_gai_completion(prompt, model="gpt-3.5-turbo", temperature=0):
+    messages = [{"role": "user", "content": prompt}]
+    response = openai.ChatCompletion.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,  # model's ramdomness degree for output
+    )
+    return response.choices[0].message["content"]

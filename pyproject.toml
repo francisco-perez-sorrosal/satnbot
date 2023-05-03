@@ -17,6 +17,7 @@ arxiv = "^1.4.3"
 pdfminer-six = "^20221105"
 clean-text = "^0.6.0"
 langchain = "^0.0.153"
+pypdf = "^3.8.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.8.0"
