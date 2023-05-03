@@ -8,14 +8,19 @@ import discord
 import openai
 import requests
 from bs4 import BeautifulSoup
-from cleantext import clean
 from discord.ext import commands, tasks
 from langchain.chains import ConversationChain
 from langchain.llms import OpenAI
 
+from arxiv_utls import (
+    extract_text_from_arxiv_pdf,
+    summarize_arxiv_paper,
+    summarize_arxiv_paper_lc,
+)
+
 # from history import ChatHistory
 from memory import Memory
-from utils import chunk_text, download_from, pdf2text
+from utils import chunk_text, clean_text, pdf2text
 
 DISCORD_CHUNK_LEN = 2000
 # Load environment variables
@@ -272,36 +277,6 @@ async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 
     await discord_multi_response(ctx, chunk_list, is_send=False)
 
 
-def clean_text(text: str, lang: str = "en") -> str:
-    cleaned_text = clean(
-        text,
-        fix_unicode=True,
-        to_ascii=True,
-        lower=False,
-        normalize_whitespace=True,
-        no_line_breaks=False,
-        strip_lines=True,
-        keep_two_line_breaks=False,
-        no_urls=True,
-        no_emails=True,
-        no_phone_numbers=False,
-        no_numbers=False,
-        no_digits=False,
-        no_currency_symbols=False,
-        no_punct=False,
-        no_emoji=True,
-        replace_with_url="<URL>",
-        replace_with_email="<EMAIL>",
-        replace_with_phone_number="<PHONE>",
-        replace_with_number="<NUMBER>",
-        replace_with_digit="0",
-        replace_with_currency_symbol="<CUR>",
-        replace_with_punct="",
-        lang=lang,
-    )
-    return cleaned_text
-
-
 @bot.slash_command(pass_context=True, name="ax")
 async def arxiv_summary(
     ctx,
@@ -311,44 +286,25 @@ async def arxiv_summary(
     style_items: int = 1,
     chunks: int = 10,
     chars_per_chunk: int = 1024,
+    overlap_chars: int = 0,
 ):  # Transformers paper arxiv
     await ctx.defer()
-    paper = download_from(arxiv_id)
-    title = paper.title
-    print(f"Paper title: {title}")
-    whole_text = pdf2text("downloaded-paper.pdf")
-    chunk_list = chunk_text(whole_text, chunk_len=chars_per_chunk)
-    total_chars = chunks * chars_per_chunk
-    print(
-        f"Chunks: {len(chunk_list)}\nSending {chunks} of {chars_per_chunk} chars each to Chat GPT (Total ~{total_chars})"
-    )
-    chat_gpt_text = " ".join(chunk_list[:chunks])
-    chat_gpt_text = clean_text(chat_gpt_text)
-    if style == "paragraph":
-        summary_style = f"{style_items} paragraph"
-    elif style == "bulletpoints":
-        summary_style = f"{style_items} bullet points"
-    elif style == "sonnet":
-        summary_style = "a sonnet style"
-    else:
-        summary_style = "a single sentence"
-    prompt = f""""
-        Please, summarize this paper in {language} in {summary_style}:
-        {chat_gpt_text}
-        """
-    print(f"Len prompt {len(chat_gpt_text)}, words {len(prompt.split())}")
-    input_content = [{"role": "user", "content": prompt}]
-    completion = openai.ChatCompletion.create(model=model_id, messages=input_content)
-    cgpt_summary = completion.choices[0].message.content
-    print(f"Text ({len(cgpt_summary)}): {cgpt_summary}")
+    title, chunk_list = extract_text_from_arxiv_pdf(arxiv_id, chars_per_chunk, overlap_chars)
+    # chat_gpt_text = " ".join(map(str, chunk_list[:chunks]))
+    # chat_gpt_text = clean_text(chat_gpt_text)
+    # print(
+    #     f"Chunks: {len(chunk_list)}\nSending {chunks} of {chars_per_chunk} chars each to Chat GPT (Total {len(chat_gpt_text)})"
+    # )
+    # cgpt_summary = summarize_arxiv_paper(chat_gpt_text, style, style_items, language)
+    cgpt_summary = summarize_arxiv_paper_lc(chunk_list, style, style_items, language)
     summary = f"""
 \n\n
 **{title}**\n
-_SUMMARY in {language} ({summary_style})_\n
+_SUMMARY in {language}_\n
 {cgpt_summary}
     """
     print(f"Discord Text Length: {len(summary)}. Will be cut to 2000")
-    chunk_list = chunk_text(response, chunk_len=DISCORD_CHUNK_LEN)
+    chunk_list = chunk_text(summary, chunk_len=DISCORD_CHUNK_LEN)
     await discord_multi_response(ctx, chunk_list, is_send=False)
 
 
