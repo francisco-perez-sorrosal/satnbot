@@ -19,7 +19,7 @@ from arxiv_utls import (
 )
 
 # from history import ChatHistory
-from memory import Memory
+from memory import ConversationEpisodicMemory  # , Memory,
 from utils import chunk_text, clean_text, pdf2text
 
 DISCORD_CHUNK_LEN = 2000
@@ -44,7 +44,7 @@ class DiscordChatGPT4(commands.Bot):
     def __init__(self, intents):
         super().__init__(intents)
         llm = OpenAI(openai_api_key=OPENAI_API_KEY, model_name=model_id, temperature=0)
-        self.memory = Memory(memory_file)
+        self.memory = ConversationEpisodicMemory(memory_file)
         self.conversation = ConversationChain(
             llm=llm, verbose=True, memory=self.memory.episodic  # We pass only the episodic part of the global memory
         )
