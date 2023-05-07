@@ -9,10 +9,6 @@ from memory import ConversationEpisodicMemory
 log_file = "satnbot.log"
 logging_config.setup_logger("satnbot", log_file, level=logging.DEBUG)
 
-llm = OpenAI(temperature=0)
-memory = ConversationEpisodicMemory(llm=llm)
-
-
 _DEFAULT_EPISODIC_MEMORY_CONVERSATION_TEMPLATE = """You are an assistant to a human, powered by a large language model trained by OpenAI.
 
 You are designed to be able to assist with a wide range of tasks, from answering simple questions to providing in-depth explanations
@@ -42,7 +38,8 @@ EPISODIC_MEMORY_CONVERSATION_TEMPLATE = PromptTemplate(
     template=_DEFAULT_EPISODIC_MEMORY_CONVERSATION_TEMPLATE,
 )
 
-
+llm = OpenAI(temperature=0)
+memory = ConversationEpisodicMemory(llm=llm)
 conversation = ConversationChain(llm=llm, verbose=True, prompt=EPISODIC_MEMORY_CONVERSATION_TEMPLATE, memory=memory)
 
 output = conversation.predict(input="Hi there!")

@@ -1,4 +1,3 @@
-import logging
 from typing import Any, Dict, List
 
 from langchain import PromptTemplate
@@ -20,8 +19,9 @@ from episodic_store import (
     EpisodeId,
     InMemoryEpisodicMemoryStore,
 )
+from logging_config import logger
 
-logger = logging.getLogger("satnbot")
+# logger = logging.getLogger()
 
 
 _DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes
@@ -124,26 +124,32 @@ class ConversationEpisodicMemory(BaseChatMemory):
 
     def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Return history buffer."""
-        chain = LLMChain(llm=self.llm, prompt=self.episode_identification_prompt)
+
+        logger.debug(f"=" * 100)
+        logger.debug(
+            f"LOAD VARIABLES\n\tInputs: {inputs}\n\tInput key: {self.input_key}\n\tMemVars: {self.memory_variables}"
+        )
+        logger.debug(f"=" * 100)
+
         if self.input_key is None:
-            logging.debug(f"Null input key {inputs}/{self.memory_variables}")
             prompt_input_key = get_prompt_input_key(inputs, self.memory_variables)
         else:
-            logger.debug(self.input_key)
             prompt_input_key = self.input_key
-        logger.debug(f"PIK {prompt_input_key}")
+        logger.debug(f"PIK: {prompt_input_key}")
         buffer_string = get_buffer_string(
             self.buffer[-self.k * 2 :],
             human_prefix=self.human_prefix,
             ai_prefix=self.ai_prefix,
         )
-        logger.debug(f"Buffer string:\n{buffer_string}")
-        logger.debug(f"Input: {inputs[prompt_input_key]}")
+        logger.debug(
+            f"CALLING episode identification CHAIN with:\n\tHistory: {buffer_string}\n\tInput: {inputs[prompt_input_key]}"
+        )
+        chain = LLMChain(llm=self.llm, prompt=self.episode_identification_prompt)
         output = chain.predict(
             history=buffer_string,
             input=inputs[prompt_input_key],
         )
-        logger.debug(f"output: {output}")
+        logger.debug(f"CHAIN Output:\n\t{output}")
         if output.strip() == "NONE":
             episode_keywords = []
         else:
@@ -155,16 +161,18 @@ class ConversationEpisodicMemory(BaseChatMemory):
 
         closest_conversations = self.episode_store.get_k_closest(episode_id)
         logger.debug(f"CC {closest_conversations}")
+        self.episode_cache.append(episode_id)  # list(map(lambda x: x[0], closest_conversations))
+        logger.debug(f"len Episodic Cache {len(self.episode_cache)}")
 
-        self.episode_cache = [episode_id]  # list(map(lambda x: x[0], closest_conversations))
-        logger.debug(f"EC {self.episode_cache}")
         episode_summaries = {}
         for id, episode_summary in closest_conversations:
             episode_summaries[id.episode_hrid] = self.episode_store.get(id, "")
+
         if self.return_messages:
             buffer: Any = self.buffer[-self.k * 2 :]
         else:
             buffer = buffer_string
+
         return {
             self.chat_history_key: buffer,
             "episode": episode_summaries,
@@ -174,7 +182,9 @@ class ConversationEpisodicMemory(BaseChatMemory):
         """Save context from this conversation to buffer."""
         super().save_context(inputs, outputs)
 
-        logger.debug(f"SAVE CTX {outputs}")
+        logger.debug(f"*" * 100)
+        logger.debug(f"SAVE CTX\n\tInputs: {inputs}\n\tOutputs: {outputs}")
+        logger.debug(f"*" * 100)
 
         if self.input_key is None:
             prompt_input_key = get_prompt_input_key(inputs, self.memory_variables)
@@ -187,13 +197,17 @@ class ConversationEpisodicMemory(BaseChatMemory):
             ai_prefix=self.ai_prefix,
         )
         input_data = inputs[prompt_input_key]
-        print(f"ESP input data: {input_data}")
+
         chain = LLMChain(llm=self.llm, prompt=self.episode_summarization_prompt)
 
+        logger.info("+" * 100)
+        logger.info(f"EP CACHE LEN: {len(self.episode_cache)}")
+        logger.info(f"EP CACHE: {[e.episode_hrid for e in self.episode_cache]}")
+        logger.info("+" * 100)
         for episode_id in self.episode_cache:
             existing_summary = self.episode_store.get(episode_id, "")
             logger.debug(
-                f"Existing summary: {existing_summary}\nepisode id: {episode_id}\nBS {buffer_string}\ninput {input_data}"
+                f"CALLING episode summarization CHAIN with:\n\tSummary: {existing_summary}\n\tEp Id: {episode_id}\n\tHistory:\n\t\t{buffer_string}\n\tInput: {input_data}"
             )
             output = chain.predict(
                 summary=existing_summary,
@@ -202,7 +216,7 @@ class ConversationEpisodicMemory(BaseChatMemory):
                 input=input_data,
                 output=outputs["response"],
             )
-            logger.debug(f"setting output for {episode_id}: {output}")
+            logger.debug(f"CHAIN setting output for {episode_id}: {output}")
             self.episode_store.set(episode_id, output.strip())
 
     def clear(self) -> None:

@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 from sentence_transformers import util
 
+from logging_config import logger
+
 
 @dataclass
 class Hashable:
@@ -72,16 +74,18 @@ class InMemoryEpisodicMemoryStore(BaseEpisodicMemoryStore):
             cosine_score = util.cos_sim(episode_embedding.embedding, stored_embedding.embedding)
             score = cosine_score.numpy()[0][0]
             scored_memory_episode = (score, stored_embedding, self.store.get(stored_embedding, default))
-            print(f"Embedding {stored_embedding.embedding[:3]}...\n\tCalculated score:{scored_memory_episode[0]}")
+            logger.debug(
+                f"Embedding {stored_embedding.embedding[:3]}...\n\tCalculated score:{scored_memory_episode[0]}"
+            )
             results.append(scored_memory_episode)
         # Sort by score
-        print(f"Results a: {results}")
+        logger.debug(f"K Closests results (not sorted): {results}")
         results.sort(key=lambda x: x[0], reverse=True)
-        print(f"Results: {results}")
+        logger.debug(f"K Closests results (sorted): {results}")
         # Return top k
         if results:
             results = list(map(lambda x: x[1:], results))[:k]
-        print(f"K Results:\n{results}")
+        logger.debug(f"K Results returned:\n{results}")
         return results
 
     def set(self, key: EpisodeId, value: Optional[str]) -> None:
