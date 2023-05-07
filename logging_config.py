@@ -27,4 +27,4 @@ def setup_logger(logger_name, log_file, level=logging.DEBUG):
     return logger
 
 
-logger = setup_logger("satnbot", "satnbot.log", level=logging.DEBUG)
+logger = setup_logger("langchain", "satnbot.log", level=logging.DEBUG)

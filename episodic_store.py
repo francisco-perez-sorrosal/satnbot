@@ -12,6 +12,8 @@ from logging_config import logger
 class Hashable:
     def __hash__(self):
         hashed = hash((getattr(self, key) for key in self.__annotations__))
+        print("=" * 100)
+        print([getattr(self, key) for key in self.__annotations__ if key == "episode_hrid"], hashed)
         return hashed
 
 
@@ -79,16 +81,20 @@ class InMemoryEpisodicMemoryStore(BaseEpisodicMemoryStore):
             )
             results.append(scored_memory_episode)
         # Sort by score
-        logger.debug(f"K Closests results (not sorted): {results}")
+        # logger.debug(f"K Closests results (not sorted): {results}")
         results.sort(key=lambda x: x[0], reverse=True)
-        logger.debug(f"K Closests results (sorted): {results}")
+        logger.debug(f"K Closests results (sorted)")
+        for i, r in enumerate(results):
+            logger.debug(f"{i}: {r[0]}: {r[1].episode_hrid} - {r[1].embedding[:3]}...: {r[2]}")
         # Return top k
         if results:
             results = list(map(lambda x: x[1:], results))[:k]
-        logger.debug(f"K Results returned:\n{results}")
+
         return results
 
     def set(self, key: EpisodeId, value: Optional[str]) -> None:
+        logger.info("&&&&" * 10)
+        logger.info(f"Setting key {key.episode_hrid} with value {value}")
         self.store[key] = value
 
     def delete(self, key: EpisodeId) -> None:
@@ -99,3 +105,9 @@ class InMemoryEpisodicMemoryStore(BaseEpisodicMemoryStore):
 
     def clear(self) -> None:
         return self.store.clear()
+
+    def __str__(self):
+        result = "Whole Memory:\n"
+        for id, summary in self.store.items():
+            result += f"{id.episode_hrid} {id.embedding[:3]}...:\n\t{summary}\n"
+        return result

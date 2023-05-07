@@ -21,9 +21,6 @@ from episodic_store import (
 )
 from logging_config import logger
 
-# logger = logging.getLogger()
-
-
 _DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes
 that the humans that interact with you have.
 Based on the last line of the human dialogue with the AI, categorize the input part of dialogue that the human and the AI are having using five keywords.
@@ -89,7 +86,7 @@ class ConversationEpisodicMemory(BaseChatMemory):
     llm: BaseLanguageModel
     episode_identification_prompt: BasePromptTemplate = EPISODE_IDENTIFICATION_PROMPT
     episode_summarization_prompt: BasePromptTemplate = EPISODE_SUMMARIZATION_PROMPT
-    episode_cache: List[EpisodeId] = []
+    relevant_episodes_cache: List[EpisodeId] = []
     k: int = 3
     chat_history_key: str = "history"
     episode_store: BaseEpisodicMemoryStore = Field(default_factory=InMemoryEpisodicMemoryStore)
@@ -159,14 +156,22 @@ class ConversationEpisodicMemory(BaseChatMemory):
         episode_embeddings = self.embeddings.embed_query(episode_hrid)
         episode_id = EpisodeId(episode_hrid=episode_hrid, embedding=episode_embeddings)
 
+        if not self.episode_store.exists(episode_id):
+            logger.info("Setting NEW episode in memory (withouth description bc it's new!!!)")
+            self.episode_store.set(episode_id, "")
+
         closest_conversations = self.episode_store.get_k_closest(episode_id)
-        logger.debug(f"CC {closest_conversations}")
-        self.episode_cache.append(episode_id)  # list(map(lambda x: x[0], closest_conversations))
-        logger.debug(f"len Episodic Cache {len(self.episode_cache)}")
+        logger.debug(f"K Closests convs (returned)")
+        for i, r in enumerate(closest_conversations):
+            logger.debug(f"{i}: {r[0].episode_hrid} - {r[0].embedding[:3]}...: {r[1]}")
 
         episode_summaries = {}
+        self.relevant_episodes_cache = []
         for id, episode_summary in closest_conversations:
-            episode_summaries[id.episode_hrid] = self.episode_store.get(id, "")
+            self.relevant_episodes_cache.append(id)  # list(map(lambda x: x[0], closest_conversations))
+            episode_summaries[id.episode_hrid] = episode_summary
+
+        logger.debug(f"Len Relevant Episodic Cache: {len(self.relevant_episodes_cache)}")
 
         if self.return_messages:
             buffer: Any = self.buffer[-self.k * 2 :]
@@ -201,11 +206,12 @@ class ConversationEpisodicMemory(BaseChatMemory):
         chain = LLMChain(llm=self.llm, prompt=self.episode_summarization_prompt)
 
         logger.info("+" * 100)
-        logger.info(f"EP CACHE LEN: {len(self.episode_cache)}")
-        logger.info(f"EP CACHE: {[e.episode_hrid for e in self.episode_cache]}")
+        logger.info(f"EP CACHE LEN: {len(self.relevant_episodes_cache)}")
+        logger.info(f"EP CACHE: {[e.episode_hrid for e in self.relevant_episodes_cache]}")
         logger.info("+" * 100)
-        for episode_id in self.episode_cache:
+        for episode_id in self.relevant_episodes_cache:
             existing_summary = self.episode_store.get(episode_id, "")
+
             logger.debug(
                 f"CALLING episode summarization CHAIN with:\n\tSummary: {existing_summary}\n\tEp Id: {episode_id}\n\tHistory:\n\t\t{buffer_string}\n\tInput: {input_data}"
             )
@@ -217,6 +223,10 @@ class ConversationEpisodicMemory(BaseChatMemory):
                 output=outputs["response"],
             )
             logger.debug(f"CHAIN setting output for {episode_id}: {output}")
+            if self.episode_store.exists(episode_id):
+                logger.info(f"{episode_id.episode_hrid} EXISTSSSS!")
+            else:
+                logger.info(f"{episode_id.episode_hrid} DOES NOT EXISTSSSS!")
             self.episode_store.set(episode_id, output.strip())
 
     def clear(self) -> None:

@@ -24,7 +24,7 @@ Overall, you are a powerful tool that can help with a wide range of tasks and pr
 topics. Whether the human needs help with a specific question or just wants to have a conversation about a particular topic, you are here
 to assist.
 
-Context:
+Episodic memory:
 {episode}
 
 Current conversation:
@@ -46,14 +46,18 @@ output = conversation.predict(input="Hi there!")
 
 print(f"First interaction ouput:\n\t{output}")
 
+print(f"Memory at end of interaction 1:\n\t{memory.episode_store}")
+print("@" * 100)
+print("@" * 100)
+
 output = conversation.predict(input="Would like to know more about you.")
 
 print(f"Second interaction ouput:\n\t{output}")
 
+print(f"Memory:\n\t{memory.episode_store}")
+# output = conversation.predict(input="Oh wow. You are such an amazing tool!")
 
-output = conversation.predict(input="Oh wow. You are such an amazing tool!")
-
-print(f"Third interaction ouput:\n\t{output}")
+# print(f"Third interaction ouput:\n\t{output}")
 
 
 # _input = {"input": "Hi, there!"}
