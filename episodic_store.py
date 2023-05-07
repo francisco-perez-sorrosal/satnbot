@@ -1,36 +1,35 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from pydantic.dataclasses import dataclass
 from sentence_transformers import util
 
 from logging_config import logger
 
 
-@dataclass
-class Hashable:
-    def __hash__(self):
-        hashed = hash((getattr(self, key) for key in self.__annotations__))
-        print("=" * 100)
-        print([getattr(self, key) for key in self.__annotations__ if key == "episode_hrid"], hashed)
-        return hashed
+def float_list_to_str(float_list: List[float]) -> Sequence[float]:
+    return tuple(float_list)
 
 
-@dataclass(eq=True)
-class EpisodeId(Hashable):
+@dataclass(eq=True, frozen=True)
+class EpisodeId(BaseModel):
     """Class that contains all relevant information for an Episode Identification."""
 
     episode_hrid: str
     """Episode Human Readable ID"""
-    embedding: List[float]
+    embedding: Sequence[float]
     """Embedding for the episode"""
+    _extract_str = validator("embedding", pre=True, allow_reuse=True)(float_list_to_str)
+
+    class Config:
+        frozen = True
+
+    # def embedding(self) -> List[float]:
+    #     return [float(idx) for idx in self.embedding_str.split(' ')]
 
     def __str__(self):
-        return f"Episode HRID {self.episode_hrid}: {self.embedding[:3]}..."
-
-    def __hash__(self):
-        return Hashable.__hash__(self)
+        return f"Episode HRID {self.episode_hrid}: {self.embedding[:5]}..."
 
 
 class BaseEpisodicMemoryStore(ABC):

@@ -49,9 +49,9 @@ EPISODE_IDENTIFICATION_PROMPT = PromptTemplate(
 
 _DEFAULT_EPISODE_SUMMARIZATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes that the
 humans that interact with you have.
-Update the summary of the provided episode in the "Episode" section based on the last line of the human dialogue with the AI.
+Update the 'Episode Summary' section below based on the last lines of the human dialogue with the AI.
 If you are writing the summary for the first time, return a single sentence.
-The update should only include facts that are relayed in the last line of conversation about the provided dialogue, and should only contain facts
+The update should only include facts that are relayed in the last lines of conversation about the provided dialogue, and should only contain facts
 about the provided episode.
 
 If there is no new information about the provided episode or the information is not worth noting (not an important or relevant fact to remember
@@ -60,19 +60,16 @@ long-term), return the existing summary unchanged.
 Full conversation history (for context):
 {history}
 
-Episode to summarize:
-{episode}
-
-Existing summary of {episode}:
+Episode summary ({episode_id}):
 {summary}
 
-Last line of conversation:
+Last lines of conversation:
 Human: {input}
 AI: {output}
 Updated summary:"""
 
 EPISODE_SUMMARIZATION_PROMPT = PromptTemplate(
-    input_variables=["episode", "summary", "history", "input", "output"],
+    input_variables=["episode_id", "summary", "history", "input", "output"],
     template=_DEFAULT_EPISODE_SUMMARIZATION_TEMPLATE,
 )
 
@@ -210,23 +207,26 @@ class ConversationEpisodicMemory(BaseChatMemory):
         logger.info(f"EP CACHE: {[e.episode_hrid for e in self.relevant_episodes_cache]}")
         logger.info("+" * 100)
         for episode_id in self.relevant_episodes_cache:
-            existing_summary = self.episode_store.get(episode_id, "")
+            episode_summary = self.episode_store.get(episode_id, "")
 
             logger.debug(
-                f"CALLING episode summarization CHAIN with:\n\tSummary: {existing_summary}\n\tEp Id: {episode_id}\n\tHistory:\n\t\t{buffer_string}\n\tInput: {input_data}"
+                f"CALLING episode summarization CHAIN with:\n\tSummary: {episode_summary}\n\tHistory:\n\t\t{buffer_string}\n\tInput: {input_data}"
             )
             output = chain.predict(
-                summary=existing_summary,
-                episode=episode_id.episode_hrid,
+                episode_id=episode_id.episode_hrid,
+                summary=episode_summary,
                 history=buffer_string,
                 input=input_data,
                 output=outputs["response"],
             )
             logger.debug(f"CHAIN setting output for {episode_id}: {output}")
             if self.episode_store.exists(episode_id):
-                logger.info(f"{episode_id.episode_hrid} EXISTSSSS!")
+                logger.info(
+                    f"Episode {episode_id.episode_hrid} EXIST!\n\tCurrent episode summary: {episode_summary if episode_summary else 'N/A' }"
+                )
             else:
-                logger.info(f"{episode_id.episode_hrid} DOES NOT EXISTSSSS!")
+                logger.info(f"{episode_id.episode_hrid} DOES NOT EXIST!")
+            logger.info(f"\tUpdating the episode to:\n\t{output.strip()}")
             self.episode_store.set(episode_id, output.strip())
 
     def clear(self) -> None:
