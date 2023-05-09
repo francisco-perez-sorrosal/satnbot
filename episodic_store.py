@@ -86,10 +86,10 @@ class InMemoryEpisodicMemoryStore(BaseEpisodicMemoryStore):
         for i, r in enumerate(results):
             logger.debug(f"{i}: {r[0]}: {r[1].episode_hrid} - {r[1].embedding[:3]}...: {r[2]}")
         # Return top k
-        if results:
-            results = list(map(lambda x: x[1:], results))[:k]
+        # if results:
+        # results = list(map(lambda x: x[1:], results))[:k]
 
-        return results
+        return results[:k]
 
     def set(self, key: EpisodeId, value: Optional[str]) -> None:
         logger.info("&&&&" * 10)

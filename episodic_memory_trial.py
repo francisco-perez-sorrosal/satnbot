@@ -8,6 +8,7 @@ from memory import ConversationEpisodicMemory
 
 log_file = "satnbot.log"
 logging_config.setup_logger("satnbot", log_file, level=logging.DEBUG)
+logger = logging.getLogger("satnbot")
 
 _DEFAULT_EPISODIC_MEMORY_CONVERSATION_TEMPLATE = """You are an assistant to a human, powered by a large language model trained by OpenAI.
 
@@ -44,37 +45,64 @@ conversation = ConversationChain(llm=llm, verbose=True, prompt=EPISODIC_MEMORY_C
 
 output = conversation.predict(input="Hi there!")
 
-print(f"First interaction ouput:\n\t{output}")
+logger.info(f"First interaction ouput:\n\t{output}")
+logger.info(f"Memory at end of interaction 1:\n\t{memory.episode_store}")
+logger.info("@" * 100)
+logger.info("\n" * 3)
 
-print(f"Memory at end of interaction 1:\n\t{memory.episode_store}")
-print("@" * 100)
-print("@" * 100)
+output = conversation.predict(input="Hi! I'm Francisco. Nice to meet you!")
+
+logger.info(f"Second interaction ouput:\n\t{output}")
+logger.info(f"Memory at end of interaction 2:\n\t{memory.episode_store}")
+logger.info("@" * 100)
+logger.info("\n" * 3)
 
 output = conversation.predict(input="Would like to know more about you.")
 
-print(f"Second interaction ouput:\n\t{output}")
+logger.info(f"Third interaction ouput:\n\t{output}")
+logger.info(f"Memory:\n\t{memory.episode_store}")
+logger.info("@" * 100)
+logger.info("\n" * 3)
 
-print(f"Memory:\n\t{memory.episode_store}")
-# output = conversation.predict(input="Oh wow. You are such an amazing tool!")
+output = conversation.predict(input="Oh wow. You are such an amazing tool! What can you do?")
 
-# print(f"Third interaction ouput:\n\t{output}")
+logger.info(f"Fourth interaction ouput:\n\t{output}")
+logger.info(f"Memory:\n\t{memory.episode_store}")
+logger.info("@" * 100)
+logger.info("\n" * 3)
+
+output = conversation.predict(input="Do you remember my name?")
+
+logger.info(f"Fifth interaction ouput:\n\t{output}")
+logger.info(f"Memory:\n\t{memory.episode_store}")
+logger.info("@" * 100)
+logger.info("\n" * 3)
+
+
+output = conversation.predict(
+    input="I'd like to introduce you also to my friend, John. Please, explain also to him your capabilities."
+)
+logger.info(f"Sixth interaction ouput:\n\t{output}")
+logger.info(f"Memory:\n\t{memory.episode_store}")
+logger.info("@" * 100)
+logger.info("\n" * 3)
 
 
 # _input = {"input": "Hi, there!"}
 # m1 = memory.load_memory_variables(_input)
-# print(m1)
+# logger.info(m1)
 # memory.save_context(
 #     _input,
 #     {"ouput": "Hello! How can I assist you today?"}
 # )
 
 # m1 = memory.load_memory_variables({"input": 'Hello!'})
-# print(m1)
+# logger.info(m1)
 
 
 # _input = {"input": "Hello! I'm francisco"}
 # m1 = memory.load_memory_variables(_input)
-# print(m1)
+# logger.info(m1)
 
 # memory.save_context(
 #     _input,

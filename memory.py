@@ -1,6 +1,5 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
-from langchain import PromptTemplate
 from langchain.chains import ConversationChain
 from langchain.chains.llm import LLMChain
 
@@ -20,57 +19,10 @@ from episodic_store import (
     InMemoryEpisodicMemoryStore,
 )
 from logging_config import logger
-
-_DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes
-that the humans that interact with you have.
-Based on the last line of the human dialogue with the AI, categorize the input part of dialogue that the human and the AI are having using five keywords.
-Return the output following these rules:
-1. The list has to be comma separated.
-2. The list has to be sorted alphabetically.
-3. To sort alphabetically, use first letter of the word and the order of the letters of the english alphabet.
-4. Filter that list to avoid stop words. Use an exhaustive list of stop words in english to filter.
-5. If after filtering the list has less than five words, add more keywords that are not on the list of stop words until it has five words.
-6. Just respond with a list of the five keywords that best represent the category of the conversation.
-
-EXAMPLE
-Last line of conversation:
-Human: Hello, I'm a human named Francisco.
-Output: ai, greetings, human, interaction, introduction
-END OF EXAMPLE
-
-Last line of conversation:
-Human: {input}
-Output:"""
-
-EPISODE_IDENTIFICATION_PROMPT = PromptTemplate(
-    input_variables=["input"],
-    template=_DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE,
-)
-
-_DEFAULT_EPISODE_SUMMARIZATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes that the
-humans that interact with you have.
-Update the 'Episode Summary' section below based on the last lines of the human dialogue with the AI.
-If you are writing the summary for the first time, return a single sentence.
-The update should only include facts that are relayed in the last lines of conversation about the provided dialogue, and should only contain facts
-about the provided episode.
-
-If there is no new information about the provided episode or the information is not worth noting (not an important or relevant fact to remember
-long-term), return the existing summary unchanged.
-
-Full conversation history (for context):
-{history}
-
-Episode summary ({episode_id}):
-{summary}
-
-Last lines of conversation:
-Human: {input}
-AI: {output}
-Updated summary:"""
-
-EPISODE_SUMMARIZATION_PROMPT = PromptTemplate(
-    input_variables=["episode_id", "summary", "history", "input", "output"],
-    template=_DEFAULT_EPISODE_SUMMARIZATION_TEMPLATE,
+from prompts import (
+    EPISODE_IDENTIFICATION_PROMPT,
+    EPISODE_MERGING_PROMPT,
+    EPISODE_SUMMARIZATION_PROMPT,
 )
 
 
@@ -83,7 +35,8 @@ class ConversationEpisodicMemory(BaseChatMemory):
     llm: BaseLanguageModel
     episode_identification_prompt: BasePromptTemplate = EPISODE_IDENTIFICATION_PROMPT
     episode_summarization_prompt: BasePromptTemplate = EPISODE_SUMMARIZATION_PROMPT
-    relevant_episodes_cache: List[EpisodeId] = []
+    episode_merging_prompt: BasePromptTemplate = EPISODE_MERGING_PROMPT
+    relevant_episodes_cache: List[Tuple[float, EpisodeId]] = []
     k: int = 3
     chat_history_key: str = "history"
     episode_store: BaseEpisodicMemoryStore = Field(default_factory=InMemoryEpisodicMemoryStore)
@@ -138,7 +91,7 @@ class ConversationEpisodicMemory(BaseChatMemory):
         logger.debug(
             f"CALLING episode identification CHAIN with:\n\tHistory: {buffer_string}\n\tInput: {inputs[prompt_input_key]}"
         )
-        chain = LLMChain(llm=self.llm, prompt=self.episode_identification_prompt)
+        chain = LLMChain(llm=self.llm, prompt=self.episode_identification_prompt, verbose=True)
         output = chain.predict(
             history=buffer_string,
             input=inputs[prompt_input_key],
@@ -160,12 +113,12 @@ class ConversationEpisodicMemory(BaseChatMemory):
         closest_conversations = self.episode_store.get_k_closest(episode_id)
         logger.debug(f"K Closests convs (returned)")
         for i, r in enumerate(closest_conversations):
-            logger.debug(f"{i}: {r[0].episode_hrid} - {r[0].embedding[:3]}...: {r[1]}")
+            logger.debug(f"{i}: {r[0]}: {r[1].episode_hrid} - {r[1].embedding[:3]}...: {r[2]}")
 
         episode_summaries = {}
         self.relevant_episodes_cache = []
-        for id, episode_summary in closest_conversations:
-            self.relevant_episodes_cache.append(id)  # list(map(lambda x: x[0], closest_conversations))
+        for score, id, episode_summary in closest_conversations:
+            self.relevant_episodes_cache.append((score, id))  # list(map(lambda x: x[0], closest_conversations))
             episode_summaries[id.episode_hrid] = episode_summary
 
         logger.debug(f"Len Relevant Episodic Cache: {len(self.relevant_episodes_cache)}")
@@ -177,7 +130,7 @@ class ConversationEpisodicMemory(BaseChatMemory):
 
         return {
             self.chat_history_key: buffer,
-            "episode": episode_summaries,
+            "episode": "\n".join([summary for _, summary in episode_summaries.items()]),
         }
 
     def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
@@ -200,22 +153,25 @@ class ConversationEpisodicMemory(BaseChatMemory):
         )
         input_data = inputs[prompt_input_key]
 
-        chain = LLMChain(llm=self.llm, prompt=self.episode_summarization_prompt)
+        chain = LLMChain(llm=self.llm, prompt=self.episode_summarization_prompt, verbose=True)
 
         logger.info("+" * 100)
-        logger.info(f"EP CACHE LEN: {len(self.relevant_episodes_cache)}")
-        logger.info(f"EP CACHE: {[e.episode_hrid for e in self.relevant_episodes_cache]}")
+        logger.info(
+            f"EP CACHE ({len(self.relevant_episodes_cache)}): {[e.episode_hrid for s, e in self.relevant_episodes_cache]}"
+        )
         logger.info("+" * 100)
-        for episode_id in self.relevant_episodes_cache:
+
+        merge_threshold = 0.9
+        candidate_episodes_to_merge = []
+        for score, episode_id in self.relevant_episodes_cache:
             episode_summary = self.episode_store.get(episode_id, "")
-
             logger.debug(
                 f"CALLING episode summarization CHAIN with:\n\tSummary: {episode_summary}\n\tHistory:\n\t\t{buffer_string}\n\tInput: {input_data}"
             )
             output = chain.predict(
                 episode_id=episode_id.episode_hrid,
                 summary=episode_summary,
-                history=buffer_string,
+                # history=buffer_string,
                 input=input_data,
                 output=outputs["response"],
             )
@@ -228,6 +184,42 @@ class ConversationEpisodicMemory(BaseChatMemory):
                 logger.info(f"{episode_id.episode_hrid} DOES NOT EXIST!")
             logger.info(f"\tUpdating the episode to:\n\t{output.strip()}")
             self.episode_store.set(episode_id, output.strip())
+            if score > merge_threshold:
+                logger.debug(f"Adding '{episode_id.episode_hrid}' ({score}) to candidate episodes to merge")
+                candidate_episodes_to_merge.append((episode_id, episode_summary))
+
+        if len(candidate_episodes_to_merge) > 1:
+            logger.info("^" * 100)
+            logger.info(f"MERGING {len(candidate_episodes_to_merge)} episodes")
+            logger.info("^" * 100)
+
+            chain = LLMChain(llm=self.llm, prompt=self.episode_merging_prompt, verbose=True)
+
+            summary_of_episodes = ""
+            for episode_id, episode_summary in candidate_episodes_to_merge:
+                summary_of_episodes += f"{episode_summary}\n\n"
+                logger.info(f"Deleting episode {episode_id} from store: {episode_summary}")
+                self.episode_store.delete(episode_id)
+
+            logger.info(f"Summary of episodes to merge:\n{summary_of_episodes}")
+
+            output = chain.predict(episodes_summary=summary_of_episodes)
+            logger.info(f"MERGING OUTPUT: {output}")
+            import json
+
+            outputs = json.loads(output)
+
+            print(outputs)
+            episode_keywords = [w.strip() for w in outputs["categories"].split(",")]
+            episode_keywords = sorted(episode_keywords)
+            episode_hrid = ",".join(episode_keywords)
+
+            embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+            episode_embeddings = embeddings.embed_query(episode_hrid)
+            episode_id = EpisodeId(episode_hrid=episode_hrid, embedding=episode_embeddings)
+            logger.info(f"\tAdding merging episode to {episode_id.episode_hrid}:\n\t{outputs['summary']}")
+            self.episode_store.set(episode_id, outputs["summary"])
+            logger.info("^" * 100)
 
     def clear(self) -> None:
         """Clear memory contents."""
