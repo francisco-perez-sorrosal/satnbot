@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List, Tuple
 
 from langchain.chains import ConversationChain
@@ -72,17 +73,15 @@ class ConversationEpisodicMemory(BaseChatMemory):
     def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Return history buffer."""
 
-        logger.debug(f"=" * 100)
-        logger.debug(
-            f"LOAD VARIABLES\n\tInputs: {inputs}\n\tInput key: {self.input_key}\n\tMemVars: {self.memory_variables}"
-        )
-        logger.debug(f"=" * 100)
-
         if self.input_key is None:
             prompt_input_key = get_prompt_input_key(inputs, self.memory_variables)
         else:
             prompt_input_key = self.input_key
-        logger.debug(f"PIK: {prompt_input_key}")
+
+        logger.debug(f"=" * 100)
+        logger.debug(f"LOAD VARS\n\tIn: {inputs}\n\tInKey: {prompt_input_key}\n\tMemVars: {self.memory_variables}")
+        logger.debug(f"=" * 100)
+
         buffer_string = get_buffer_string(
             self.buffer[-self.k * 2 :],
             human_prefix=self.human_prefix,
@@ -97,18 +96,11 @@ class ConversationEpisodicMemory(BaseChatMemory):
             input=inputs[prompt_input_key],
         )
         logger.debug(f"CHAIN Output:\n\t{output}")
-        if output.strip() == "NONE":
-            episode_keywords = []
-        else:
-            episode_keywords = [w.strip() for w in output.split(",")]
-        episode_keywords = sorted(episode_keywords)
-        episode_hrid = ",".join(episode_keywords)
-        episode_embeddings = self.embeddings.embed_query(episode_hrid)
-        episode_id = EpisodeId(episode_hrid=episode_hrid, embedding=episode_embeddings)
+        episode_id = self.build_episode_id(output)
 
         if not self.episode_store.exists(episode_id):
             logger.info("Setting NEW episode in memory (withouth description bc it's new!!!)")
-            self.episode_store.set(episode_id, "")
+            self.episode_store.set(episode_id, inputs[prompt_input_key])
 
         closest_conversations = self.episode_store.get_k_closest(episode_id)
         logger.debug(f"K Closests convs (returned)")
@@ -132,6 +124,17 @@ class ConversationEpisodicMemory(BaseChatMemory):
             self.chat_history_key: buffer,
             "episode": "\n".join([summary for _, summary in episode_summaries.items()]),
         }
+
+    def build_episode_id(self, output):
+        if output.strip() == "NONE":
+            episode_keywords = []
+        else:
+            episode_keywords = [w.strip() for w in output.split(",")]
+        episode_keywords = sorted(episode_keywords)
+        episode_hrid = ",".join(episode_keywords)
+        episode_embeddings = self.embeddings.embed_query(episode_hrid)
+        episode_id = EpisodeId(episode_hrid=episode_hrid, embedding=episode_embeddings)
+        return episode_id
 
     def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
         """Save context from this conversation to buffer."""
@@ -161,13 +164,14 @@ class ConversationEpisodicMemory(BaseChatMemory):
         )
         logger.info("+" * 100)
 
-        merge_threshold = 0.9
+        merge_threshold = 0.75
         candidate_episodes_to_merge = []
         for score, episode_id in self.relevant_episodes_cache:
             episode_summary = self.episode_store.get(episode_id, "")
             logger.debug(
                 f"CALLING episode summarization CHAIN with:\n\tSummary: {episode_summary}\n\tHistory:\n\t\t{buffer_string}\n\tInput: {input_data}"
             )
+
             output = chain.predict(
                 episode_id=episode_id.episode_hrid,
                 summary=episode_summary,
@@ -176,17 +180,28 @@ class ConversationEpisodicMemory(BaseChatMemory):
                 output=outputs["response"],
             )
             logger.debug(f"CHAIN setting output for {episode_id}: {output}")
+            json_outputs = json.loads(output)
             if self.episode_store.exists(episode_id):
                 logger.info(
                     f"Episode {episode_id.episode_hrid} EXIST!\n\tCurrent episode summary: {episode_summary if episode_summary else 'N/A' }"
                 )
             else:
                 logger.info(f"{episode_id.episode_hrid} DOES NOT EXIST!")
-            logger.info(f"\tUpdating the episode to:\n\t{output.strip()}")
-            self.episode_store.set(episode_id, output.strip())
+            summary = json_outputs["summary"]
+            categories = json_outputs["categories"]
+
+            new_episode_id = self.build_episode_id(categories)
+            logger.info(
+                f"\tUpdating episode:\nOld categories: {episode_id.episode_hrid}\nNew categories: {categories}\n\t{summary.strip()}"
+            )
+            self.episode_store.delete(episode_id)
+            self.episode_store.set(new_episode_id, summary.strip())
+
             if score > merge_threshold:
-                logger.debug(f"Adding '{episode_id.episode_hrid}' ({score}) to candidate episodes to merge")
-                candidate_episodes_to_merge.append((episode_id, episode_summary))
+                logger.debug(
+                    f"Adding '{new_episode_id.episode_hrid}' (Old score was: {score}) to candidate episodes to merge"
+                )
+                candidate_episodes_to_merge.append((new_episode_id, summary.strip()))
 
         if len(candidate_episodes_to_merge) > 1:
             logger.info("^" * 100)
@@ -205,8 +220,6 @@ class ConversationEpisodicMemory(BaseChatMemory):
 
             output = chain.predict(episodes_summary=summary_of_episodes)
             logger.info(f"MERGING OUTPUT: {output}")
-            import json
-
             outputs = json.loads(output)
 
             print(outputs)
@@ -226,6 +239,17 @@ class ConversationEpisodicMemory(BaseChatMemory):
         self.chat_memory.clear()
         # self.entity_cache.clear()
         # self.episode_store.clear()
+
+
+from typing import List, Tuple
+
+
+def pairwise_combinations(elements: List) -> List[Tuple]:
+    pairs = []
+    for i in range(len(elements)):
+        for j in range(i + 1, len(elements)):
+            pairs.append((elements[i], elements[j]))
+    return pairs
 
 
 # class Memory(BaseMemory):

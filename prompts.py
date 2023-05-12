@@ -1,11 +1,11 @@
 from langchain import PromptTemplate
 
-_DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes
-that the humans that interact with you have.
+_DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself building an episodic memory to keep track of facts about the relevant episodes
+the humans that interact with you have.
 Based on the last line of the human dialogue with the AI, classify the input part of dialogue that the human and the AI are having
-using exactly seven keywords related to categories. The list has to be comma separated.
+using exactly seven keywords that categorize the last line added by the human. Avoid using names. The list has to be comma separated.
 
-Last line of conversation:
+[LAST LINE OF DIALOGUE]
 Human: {input}
 Output:"""
 EPISODE_IDENTIFICATION_PROMPT = PromptTemplate(
@@ -13,15 +13,20 @@ EPISODE_IDENTIFICATION_PROMPT = PromptTemplate(
     template=_DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE,
 )
 
-_DEFAULT_EPISODE_SUMMARIZATION_TEMPLATE = """You are an AI assistant helping yourself to keep track of facts about relevant episodes that the
-humans that interact with you have.
-Update the 'Episode Summary' section below based on the last lines of the human dialogue with the AI.
-If you are writing the summary for the first time, return a single sentence.
-The update should only include facts that are relayed in the last lines of conversation about the provided dialogue, and should only contain facts
-about the provided episode.
+_DEFAULT_EPISODE_SUMMARIZATION_TEMPLATE = """You are an AI assistant acting as an episodic memory. You track and extract facts (episodes)
+from the interaction with humans.
+
+
+You will return a json object after [NEW EPISODE JSON] tag. You will update the content of the 'Episode Summary' section below based on
+the last lines of the human dialogue with the AI. If you are writing the summary for the first time, return a single sentence.
+The update will add new facts that are relayed in the last lines of conversation about the provided dialogue.
+You will add the updated summary to an attribute named 'summary' in the JSON to return.
 
 If there is no new information about the provided episode or the information is not worth noting (not an important or relevant fact to remember
-long-term), return the existing summary unchanged.
+long-term), return the existing summary unchanged in the 'summary' attribute of the JSON.
+
+The json object will also include an attribute named 'categories' that will have a comma-separated list of exactly seven keywords related
+to categories that best categorize the new summary you are providing.
 
 Episode summary ({episode_id}):
 {summary}
@@ -29,7 +34,7 @@ Episode summary ({episode_id}):
 Last lines of conversation:
 Human: {input}
 AI: {output}
-Updated summary:"""
+[NEW EPISODE JSON]"""
 
 EPISODE_SUMMARIZATION_PROMPT = PromptTemplate(
     input_variables=["episode_id", "summary", "input", "output"],

@@ -64,28 +64,57 @@ logger.info(f"Memory:\n\t{memory.episode_store}")
 logger.info("@" * 100)
 logger.info("\n" * 3)
 
-output = conversation.predict(input="Oh wow. You are such an amazing tool! What can you do?")
-
-logger.info(f"Fourth interaction ouput:\n\t{output}")
+output = conversation.predict(input="I'd like to introduce you also to my friend, John.")
+logger.info(f"4th interaction ouput:\n\t{output}")
 logger.info(f"Memory:\n\t{memory.episode_store}")
 logger.info("@" * 100)
 logger.info("\n" * 3)
 
-output = conversation.predict(input="Do you remember my name?")
-
-logger.info(f"Fifth interaction ouput:\n\t{output}")
+output = conversation.predict(input="Please explain also to him your capabilities. Refer to him as Sir and his name.")
+logger.info(f"5th interaction ouput:\n\t{output}")
 logger.info(f"Memory:\n\t{memory.episode_store}")
 logger.info("@" * 100)
 logger.info("\n" * 3)
 
-
-output = conversation.predict(
-    input="I'd like to introduce you also to my friend, John. Please, explain also to him your capabilities."
-)
-logger.info(f"Sixth interaction ouput:\n\t{output}")
+output = conversation.predict(input="Do you remember my name? Say my name and show some respect.")
+logger.info(f"6th interaction ouput:\n\t{output}")
 logger.info(f"Memory:\n\t{memory.episode_store}")
 logger.info("@" * 100)
 logger.info("\n" * 3)
+
+from sentence_transformers import util
+
+from memory import pairwise_combinations
+
+ep_ids_pairs = pairwise_combinations(list(memory.episode_store.store.keys()))
+
+for emb1, emb2 in ep_ids_pairs:
+    cosine_score = util.cos_sim(emb1.embedding, emb2.embedding)
+    score = cosine_score.numpy()[0][0]
+    logger.info(f"Score:\n{emb1.episode_hrid}\nvs\n{emb2.episode_hrid}: {score}\n\n")
+
+# output = conversation.predict(input="Oh wow. You are such an amazing tool! What can you do?")
+
+# logger.info(f"Fourth interaction ouput:\n\t{output}")
+# logger.info(f"Memory:\n\t{memory.episode_store}")
+# logger.info("@" * 100)
+# logger.info("\n" * 3)
+
+# output = conversation.predict(input="Do you remember my name?")
+
+# logger.info(f"Fifth interaction ouput:\n\t{output}")
+# logger.info(f"Memory:\n\t{memory.episode_store}")
+# logger.info("@" * 100)
+# logger.info("\n" * 3)
+
+
+# output = conversation.predict(
+#     input="I'd like to introduce you also to my friend, John. Please, explain also to him your capabilities."
+# )
+# logger.info(f"Sixth interaction ouput:\n\t{output}")
+# logger.info(f"Memory:\n\t{memory.episode_store}")
+# logger.info("@" * 100)
+# logger.info("\n" * 3)
 
 
 # _input = {"input": "Hi, there!"}
