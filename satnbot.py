@@ -280,32 +280,32 @@ async def arxiv_sanity_summary(ctx, filter_tags: TagFilter, filter_count: int = 
 @bot.slash_command(pass_context=True, name="ax")
 async def arxiv_summary(
     ctx,
-    arxiv_id: str = "1706.03762",
+    arxiv_id_or_url: str = "1706.03762",
     language: str = "english",
     style: str = "paragraph",
     style_items: int = 1,
     chunks: int = 10,
     chars_per_chunk: int = 1024,
     overlap_chars: int = 0,
+    in_depth: bool = False,
 ):  # Transformers paper arxiv
     await ctx.defer()
-    title, chunk_list = extract_text_from_arxiv_pdf(arxiv_id, chars_per_chunk, overlap_chars)
-    # chat_gpt_text = " ".join(map(str, chunk_list[:chunks]))
-    # chat_gpt_text = clean_text(chat_gpt_text)
-    # print(
-    #     f"Chunks: {len(chunk_list)}\nSending {chunks} of {chars_per_chunk} chars each to Chat GPT (Total {len(chat_gpt_text)})"
-    # )
-    # cgpt_summary = summarize_arxiv_paper(chat_gpt_text, style, style_items, language)
-    cgpt_summary = summarize_arxiv_paper_lc(chunk_list, style, style_items, language)
-    summary = f"""
-\n\n
-**{title}**\n
-_SUMMARY in {language}_\n
-{cgpt_summary}
-    """
-    print(f"Discord Text Length: {len(summary)}. Will be cut to 2000")
-    chunk_list = chunk_text(summary, chunk_len=DISCORD_CHUNK_LEN)
-    await discord_multi_response(ctx, chunk_list, is_send=False)
+    title, chunk_list = extract_text_from_arxiv_pdf(arxiv_id_or_url, chars_per_chunk, overlap_chars)
+    cgpt_summary = summarize_arxiv_paper_lc(chunk_list, in_depth, style, style_items, language)
+    if not in_depth:
+        summary = f"""
+                \n\n
+                **{title}**\n
+                _SUMMARY in {language}_\n
+                {cgpt_summary}
+                    """
+        print(f"Discord Text Length: {len(summary)}. Will be cut to 2000")
+        chunk_list = chunk_text(summary, chunk_len=DISCORD_CHUNK_LEN)
+        await discord_multi_response(ctx, chunk_list, is_send=False)
+    else:
+        with open(f"summary.md", "w") as f:
+            f.write(cgpt_summary)
+        await ctx.send("Download file!", file=discord.File(f"summary.md"))
 
 
 bot.run(DISCORD_TOKEN)

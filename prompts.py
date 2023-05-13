@@ -1,5 +1,6 @@
 from langchain import PromptTemplate
 
+
 _DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself building an episodic memory to keep track of facts about the relevant episodes
 the humans that interact with you have.
 Based on the last line of the human dialogue with the AI, classify the input part of dialogue that the human and the AI are having
@@ -61,4 +62,38 @@ New Episode Summary JSON:"""
 EPISODE_MERGING_PROMPT = PromptTemplate(
     input_variables=["episodes_summary"],
     template=_DEFAULT_EPISODE_MERGING_TEMPLATE,
+)
+
+
+ARXIV_SUMMARIZATION_PROMPT_TEMPLATE = """
+    Summarize the technical text, delimited by triple
+    =, in {language} in {summary_style}:
+    ==={text}===
+"""
+
+ARXIV_SUMMARIZATION_PROMPT = PromptTemplate(
+    template=ARXIV_SUMMARIZATION_PROMPT_TEMPLATE, input_variables=["text", "language", "summary_style"]
+)
+
+
+ARXIV_MD_SUMMARIZATION_PROMPT_TEMPLATE = """
+    Write a concise summary of each section and subsection of the text below, delimited below by triple = in {language} language.
+    The summary of the sections/subsections should concisely in one paragraph each.
+    Do not summarize neither references nor acknowledgements.
+    If it exists, summarize also the sections and subsections in the appendices and/or supplementary material that may
+    appear at the end of the paper.
+    Do not include in the summary or summarize the legend of the figures.
+
+    Return the summary in markdown format. Follow these rules for formatting the markdown:
+    1) Heading level 1 should be the title of the paper.
+    2) Heading level 2 should be the title of each section.
+    3) Heading level 3 should be the summary of each sub-section.
+    4) The summary of each section or subsection should be in regular text.
+    5) The summary of each section should be followed by a horizontal rule.
+
+    ==={text}===
+"""
+
+ARXIV_MD_SUMMARIZATION_PROMPT = PromptTemplate(
+    template=ARXIV_MD_SUMMARIZATION_PROMPT_TEMPLATE, input_variables=["text", "language"]
 )
