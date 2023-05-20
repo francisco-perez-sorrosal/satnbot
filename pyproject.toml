@@ -20,6 +20,8 @@ langchain = "^0.0.153"
 pypdf = "^3.8.1"
 sentence-transformers = "^2.2.2"
 coloredlogs = "^15.0.1"
+ipykernel = "^6.23.0"
+matplotlib = "^3.7.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.8.0"

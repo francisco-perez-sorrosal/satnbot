@@ -80,10 +80,12 @@ def clean_text(text: str, lang: str = "en") -> str:
 
 
 def get_gai_completion(prompt, model="gpt-3.5-turbo", temperature=0):
+    print("HERE")
     messages = [{"role": "user", "content": prompt}]
     response = openai.ChatCompletion.create(
         model=model,
         messages=messages,
         temperature=temperature,  # model's ramdomness degree for output
     )
+    print("HERE too")
     return response.choices[0].message["content"]

@@ -1,6 +1,5 @@
 from langchain import PromptTemplate
 
-
 _DEFAULT_EPISODE_IDENTIFICATION_TEMPLATE = """You are an AI assistant helping yourself building an episodic memory to keep track of facts about the relevant episodes
 the humans that interact with you have.
 Based on the last line of the human dialogue with the AI, classify the input part of dialogue that the human and the AI are having
@@ -77,19 +76,36 @@ ARXIV_SUMMARIZATION_PROMPT = PromptTemplate(
 
 
 ARXIV_MD_SUMMARIZATION_PROMPT_TEMPLATE = """
-    Write a concise summary of each section and subsection of the text below, delimited below by triple = in {language} language.
-    The summary of the sections/subsections should concisely in one paragraph each.
-    Do not summarize neither references nor acknowledgements.
-    If it exists, summarize also the sections and subsections in the appendices and/or supplementary material that may
-    appear at the end of the paper.
+    You are an expert summarizer of technical papers. You are given a paper and you have to summarize in {language} it in a concise way.
+    Concise means one paragraph each.
+    You will provide a summary per each section and subsection of the text delimited below by triple =.
+    Ignore reference and acknowledgements sections.
+    If exist, summarize also sections and subsections in the appendices and/or supplementary material that may
+    appear after the references.
     Do not include in the summary or summarize the legend of the figures.
+    The structure of sections and subsections in papers is as follows:
+    <NUMBER>. <SECTION TITLE>
+    <TEXT...>
+    <NUMBER>.<NUMBER> <SUBSECTION TITLE>
+    <TEXT...>
+    <NUMBER>. <SECTION TITLE>
+    <TEXT...>
+    <CAPITALIZED CHARACTER>. <APPENDIX SECTION TITLE>
+    <TEXT...>
 
-    Return the summary in markdown format. Follow these rules for formatting the markdown:
+    The format of the summary will be in Markdown. The rules for the markdown appear below.
+
+    Markdown rules:
     1) Heading level 1 should be the title of the paper.
     2) Heading level 2 should be the title of each section.
     3) Heading level 3 should be the summary of each sub-section.
     4) The summary of each section or subsection should be in regular text.
     5) The summary of each section should be followed by a horizontal rule.
+
+    You will return a JSON object with to properties.
+    The first property will be named 'summary' and will contain the markdown summary of each section of the technical paper.
+    The second property will be named 'remaining_text' and will contain the title and text of the last section if the title
+    or the text of that section/subsection was cut in the middle Otherwise, 'remaining_text' should return 'N/A'.
 
     ==={text}===
 """
