@@ -22,6 +22,13 @@ cd satnbot
 poetry install
 ```
 
+## Dockerize
+
+```sh
+docker build -t "satnbot" .
+docker run -it --rm -e DISCORD_TOKEN="MTA-xxx" -e OPENAI_API_KEY="sk-xxx" satnbot
+```
+
 ## Discord Prerequisites
 
 I'm assuming you have your fancy Discord account! 😃

@@ -142,3 +142,5 @@ output.txt
 downloaded-paper.pdf
 history.pkl
 historic_mem.pkl
+memory.pkl
+summary.md
