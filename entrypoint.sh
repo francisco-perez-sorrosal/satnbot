@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python satnbot.py
+nohup sh -c python satnbot.py &
