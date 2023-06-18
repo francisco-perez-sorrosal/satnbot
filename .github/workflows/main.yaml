@@ -49,6 +49,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_SERVER_HOST }}
           username: ${{ secrets.EC2_SERVER_USERNAME }}
+          # if error 'ssh: handshake failed: ssh: unable to...' then add 'CASignatureAlgorithms +ssh-rsa' to /etc/ssh/sshd_config
           key: ${{ secrets.EC2_SERVER_SSH_PRIVATE_KEY }}
           #password: ${{ secrets.EC2_SERVER_PASSWORD }}
           script: |
