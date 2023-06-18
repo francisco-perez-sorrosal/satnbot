@@ -45,14 +45,14 @@ jobs:
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/satnbot:latest
 
       - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v0.1.4
+        uses: fifsky/ssh-action@master
         with:
           host: ${{ secrets.EC2_SERVER_HOST }}
-          username: ${{ secrets.EC2_SERVER_USERNAME }}
+          user: ${{ secrets.EC2_SERVER_USERNAME }}
           # if error 'ssh: handshake failed: ssh: unable to...' then add 'CASignatureAlgorithms +ssh-rsa' to /etc/ssh/sshd_config
           key: ${{ secrets.EC2_SERVER_SSH_PRIVATE_KEY }}
           #password: ${{ secrets.EC2_SERVER_PASSWORD }}
-          script: |
+          command: |
             CI=true docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
             CI=true docker stop satnbot
             CI=true docker image prune -a
