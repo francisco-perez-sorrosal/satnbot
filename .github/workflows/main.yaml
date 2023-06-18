@@ -56,4 +56,4 @@ jobs:
             CI=true docker stop satnbot
             CI=true docker image prune -a
             CI=true docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/satnbot:latest
-            CI=true docker run -it --rm --name satnbot -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPEN_AI_KEY }} satnbot
+            CI=true docker run -it --rm --name satnbot -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} satnbot
