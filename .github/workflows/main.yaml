@@ -53,8 +53,10 @@ jobs:
           key: ${{ secrets.EC2_SERVER_SSH_PRIVATE_KEY }}
           #password: ${{ secrets.EC2_SERVER_PASSWORD }}
           command: |
+            CI=true docker ps -q
             CI=true docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
             CI=true docker stop ${{ secrets.DOCKER_HUB_USERNAME }}/satnbot
+            CI=true docker stop satnbot
             CI=true docker image prune -a -f
             CI=true docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/satnbot:latest
-            CI=true docker run --rm --name satnbot -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} ${{ secrets.DOCKER_HUB_USERNAME }}/satnbot
+            # CI=true docker run --rm --name satnbot -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} ${{ secrets.DOCKER_HUB_USERNAME }}/satnbot

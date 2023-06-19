@@ -1,3 +1,5 @@
 #!/bin/sh
 
-nohup sh -c python satnbot.py &
+set -e
+
+python satnbot.py &
