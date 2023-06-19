@@ -2,4 +2,4 @@
 
 set -e
 
-python satnbot.py &
+python satnbot.py
